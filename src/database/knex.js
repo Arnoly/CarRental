@@ -6,6 +6,6 @@ module.exports = Knex({
     client: 'sqlite3',
     useNullAsDefault: true,
     connection: {
-        filename: `./db.sqlite`,
+        filename: `db.sqlite`,
     },
 });

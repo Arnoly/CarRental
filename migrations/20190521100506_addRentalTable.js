@@ -3,10 +3,10 @@ exports.up = function(knex, Promise) {
 
     return knex.schema.createTable( 'rental', table => {
         table.increments('id');
-        table.string('from');
-        table.string('to');
-        table.integer('car_id');
-        table.integer('person_id');
+        table.timestamp('from');
+        table.timestamp('to');
+        table.integer('car_id').references('car.id');
+        table.integer('person_id').references('person.id');
     })
 };
 
