@@ -8,7 +8,6 @@ const axios = require('axios');
 
 const Person = require('./src/database/models/Person');
 const Car = require('./src/database/models/Car');
-const CarbonIntensity = require('./src/database/models/CarbonIntensity');
 const Rental = require('./src/database/models/Rental');
 
 
@@ -37,20 +36,51 @@ app.post('/addRental', async (req, res) =>
             {
                Car.query().findById(req.body.car_id).then(async car =>
                {
-                   //Get carbon intensity for specified date
-                   await getIntensityFromDate(req.body.from);
+                   //Check if rental dates are coherent
+                   let dateStartRental = moment(req.body.from).format('YYYY-MM-DD');
+                   let dateEndRental = moment(req.body.to).format('YYYY-MM-DD');
+                   if(dateEndRental>dateStartRental)
+                   {
+                       //Get carbon intensity for specified date
+                       let avg = Math.round(await getIntensityFromDate(req.body.from));
+                       let car = getVehicleFromId(req.body.car_id);
+                       if(avg < 250)
+                       {
+                           switch (car.emission)
+                           {
+                               case 80 < car.emission < 100:
+                                   await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                   await updateCarStatusFromId(req.body.car_id);
+                                   res.send(`Votre réservation a bien été effectuée.
+                                             Vous avez réservé la voiture n° ${req.body.car_id},
+                                             du ${moment(req.body.from).format('YYYY-MM-DD')}
+                                             au ${moment(req.body.to).format('YYYY-MM-DD')}`);
+                                   break;
+                               case 100 < car.emission < 120:
+                                   res.send('Erreur lors de la réservation, cette voiture émet trop de CO2 au vues de la période choisie');
+                                   break;
+                               default:
+                                   res.send('Erreur lors de la réservation, cette voiture émet trop de CO2 au vues de la période choisie');
+                                   break;
+                           }
+                       }
+                       else
+                       {
+                           res.send('else')
+                       }
+                           //switch
 
-
+                   }
+                   else
+                   {
+                       res.send('Veuillez rentrer des dates correctes');
+                   }
                });
             }
 
         });
     }
-    res.send('waiting');
 });
-
-
-
 
 app.listen(3000, () => console.log('Server listening'));
 
@@ -75,33 +105,50 @@ function isCarInTable(id)
 
 function getIntensityFromDate(date)
 {
-    return axios.get('https://api.carbonintensity.org.uk/intensity/date/' + moment(date).format('YYYY-MM-DD')).then(async intensityList =>
+    const dateRental = moment(date).format('YYYY-MM-DD');
+    const now = moment().format('YYYY-MM-DD');
+    let forecasts = [];
+    if(dateRental > now)
     {
-        for(const anIntensity of intensityList.data.data)
+        return axios.get('https://api.carbonintensity.org.uk/intensity/date/' + moment(date).format('YYYY-MM-DD')).then(async intensityList =>
         {
-            if(await isDateInTable(date))
+            for(const anIntensity of intensityList.data.data)
             {
-                break;
+                forecasts.push(anIntensity.intensity.forecast);
             }
-            else
-            {
-                await CarbonIntensity.query().insert({
-                    from: anIntensity.from,
-                    to: anIntensity.to,
-                    forecast: anIntensity.intensity.forecast,
-                    actual: anIntensity.intensity.actual,
-                    index: anIntensity.intensity.index,
-                });
-            }
+            let sum = forecasts.reduce((previous, current) => current += previous);
+            return sum / forecasts.length;
+        });
+    }
+    else
+    {
+        return false;
+    }
 
-        }
-    });
 }
 
-function isDateInTable(date)
+function getVehicleFromId(id)
 {
-    return CarbonIntensity.query().where('from', date).then(tableData =>
-    {
-        return tableData.length > 0;
-    });
+   return Car.query().findById(id).then(car =>
+   {
+       return car;
+   });
+}
+
+function updateCarStatusFromId(id)
+{
+    return Car.query().findById(id).patch( {isReservee: 1} )
+        .then(car => {return car;});
+}
+
+function applyRental(from, to, car_id, person_id)
+{
+    return Rental.query().insert(
+        {
+            from: from,
+            to: to,
+            car_id: car_id,
+            person_id: person_id
+        }
+    ).then(rental => {return rental;});
 }

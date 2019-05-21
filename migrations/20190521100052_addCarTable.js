@@ -5,6 +5,7 @@ exports.up = function(knex, Promise) {
         table.string('marque');
         table.string('name');
         table.integer('emission');
+        table.integer('isReservee');
     })
 
 };
