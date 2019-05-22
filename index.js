@@ -26,82 +26,139 @@ app.get('/rentals', (req, res) =>
 
 app.post('/addRental', async (req, res) =>
 {
-    console.log(await isCarInTable(req.body.car_id));
+    //console.log(await isCarInTable(req.body.car_id));
     //Check for person and car existence
     if(await isPersonInTable(req.body.person_id) && await isCarInTable(req.body.car_id))
     {
-        console.log('Person and car existence checked');
+        //console.log('Person and car existence checked');
         Person.query().findById(req.body.person_id).then(async person =>
         {
                Car.query().findById(req.body.car_id).then(async car =>
                {
-                   let carEmission = car.emission;
-                   //Check if rental dates are coherent
-                   let dateStartRental = moment(req.body.from).format('YYYY-MM-DD');
-                   let dateEndRental = moment(req.body.to).format('YYYY-MM-DD');
-                   if(dateEndRental>dateStartRental && dateStartRental > moment().format('YYYY-MM-DD'))
+                   if(car.isReservee === 0)
                    {
-                       console.log('Les dates sont cohérentes');
-                       //Get average carbon intensity for specified date
-                       let avg = Math.round(await getIntensityFromDate(req.body.from));
-                       let car = getVehicleFromId(req.body.car_id);
-                       if(avg < 250)
+                       let carEmission = car.emission;
+                       //Check if rental dates are coherent
+                       let dateStartRental = moment(req.body.from).format('YYYY-MM-DD hh:mm:ss');
+                       let dateEndRental = moment(req.body.to).format('YYYY-MM-DD hh:mm:ss');
+                       if(dateEndRental>dateStartRental && dateStartRental > moment().format('YYYY-MM-DD hh:mm:ss'))
                        {
-                           console.log('Prévision à avg < 250');
-                           //console.log(carEmission);
-                           if (carEmission < 80)
+                           //console.log('Les dates sont cohérentes');
+                           if(await isRentalUnique(req.body.from, req.body.to, req.body.car_id, req.body.person_id) === false)
                            {
-                               console.log('car.emission < 80');
-                               await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
-                               await updateCarStatusFromId(req.body.car_id);
-                               res.send(`Votre réservation a bien été effectuée.
+                               //Get average carbon intensity for specified date
+                               let avg = Math.round(await getIntensityFromDate(req.body.from));
+                               if (avg === 0)
+                               {
+                                   res.send(`Nous n'avons aucune information quant aux prévisions d'intensité carbone.
+                                    votre réservation sera tout de même faite mais roulez doucement` +
+                                       ` Votre réservation a bien été effectuée.
                                              Vous avez réservé la voiture n° ${req.body.car_id},
-                                             du ${moment(req.body.from).format('YYYY-MM-DD')}
-                                             au ${moment(req.body.to).format('YYYY-MM-DD')}`);
-                           }
-
-                           else if(80 < carEmission < 100)
-                           {
-                                   console.log('80 < car.emission < 100');
+                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
+                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
+                                   //console.log('car.emission == 0');
                                    await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
                                    await updateCarStatusFromId(req.body.car_id);
-                                   res.send(`Votre réservation a bien été effectuée.
+                               }
+                               else if(0 < avg <= 250)
+                               {
+                                   //console.log('Prévision à avg <= 250');
+                                   if (carEmission < 80)
+                                   {
+                                       //console.log('car.emission < 80');
+                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await updateCarStatusFromId(req.body.car_id);
+                                       res.send(`Votre réservation a bien été effectuée.
                                              Vous avez réservé la voiture n° ${req.body.car_id},
-                                             du ${moment(req.body.from).format('YYYY-MM-DD')}
-                                             au ${moment(req.body.to).format('YYYY-MM-DD')}`);
-                           }
+                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
+                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
+                                   }
 
-                           else if(100 < carEmission < 140)
-                           {
-                                   console.log('100 < car.emission < 120');
-                                   await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
-                                   await updateCarStatusFromId(req.body.car_id);
-                                   res.send(`Votre réservation a bien été effectuée.
+                                   else if(80 < carEmission < 100)
+                                   {
+                                       //console.log('80 < car.emission < 100');
+                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await updateCarStatusFromId(req.body.car_id);
+                                       res.send(`Votre réservation a bien été effectuée.
                                              Vous avez réservé la voiture n° ${req.body.car_id},
-                                             du ${moment(req.body.from).format('YYYY-MM-DD')}
-                                             au ${moment(req.body.to).format('YYYY-MM-DD')}
+                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
+                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
+                                   }
+
+                                   else if(100 < carEmission < 140)
+                                   {
+                                       //console.log('100 < car.emission < 120');
+                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await updateCarStatusFromId(req.body.car_id);
+                                       res.send(`Votre réservation a bien été effectuée.
+                                             Vous avez réservé la voiture n° ${req.body.car_id},
+                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
+                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}
                                              mais l'empreinte carbon de votre voiture est élevée, roulez doucement`);
+                                   }
+                                   else
+                                   {
+                                       res.send("La réservation n'a pas été faite, cette voiture pollue trop");
+                                   }
+
+                               }
+                               else if(avg > 250)
+                               {
+                                   //console.log('Prévision à avg > 250');
+                                   if (carEmission < 80)
+                                   {
+                                       //console.log('car.emission < 80');
+                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await updateCarStatusFromId(req.body.car_id);
+                                       res.send(`Votre réservation a bien été effectuée.
+                                             Vous avez réservé la voiture n° ${req.body.car_id},
+                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
+                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
+                                   }
+
+                                   else if(80 < carEmission < 120)
+                                   {
+                                       //console.log('80 < car.emission < 100');
+                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await updateCarStatusFromId(req.body.car_id);
+                                       res.send(`Votre réservation a bien été effectuée.
+                                             Vous avez réservé la voiture n° ${req.body.car_id},
+                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
+                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
+                                   }
+
+                                   else
+                                   {
+                                       res.send("La réservation n'a pas été faite, cette voiture pollue trop");
+                                   }
+                               }
                            }
+                           else
+                           {
+                               res.send('Vous avez déja réservé ce véhicule à la même date');
+                           }
+
 
                        }
-                       //Else de avg
                        else
                        {
-                           res.send('else')
+                           res.send('Veuillez rentrer des dates correctes');
                        }
-                           //switch
-
                    }
                    else
                    {
-                       res.send('Veuillez rentrer des dates correctes');
+                       res.send('Ce véhicule est déjà réservé, veuillez en choisir un autre.');
                    }
+
                });
         });
     }
 });
 
 app.listen(3000, () => console.log('Server listening'));
+
+
+
 
 
 function isPersonInTable(id)
@@ -135,8 +192,11 @@ function getIntensityFromDate(date)
             {
                 forecasts.push(anIntensity.intensity.forecast);
             }
-            let sum = forecasts.reduce((previous, current) => current += previous);
-            return sum / forecasts.length;
+            try {
+                let sum = forecasts.reduce((previous, current) => current += previous).catch();
+                return sum / forecasts.length;
+            }catch(Exception){return 0;}
+
         });
     }
     else
@@ -144,14 +204,6 @@ function getIntensityFromDate(date)
         return false;
     }
 
-}
-
-function getVehicleFromId(id)
-{
-   return Car.query().findById(id).then(car =>
-   {
-       return car;
-   });
 }
 
 function updateCarStatusFromId(id)
@@ -170,4 +222,13 @@ function applyRental(from, to, car_id, person_id)
             person_id: person_id
         }
     ).then(rental => {return rental;});
+}
+
+function isRentalUnique(from, to, car_id, person_id)
+{
+    return Rental.query().where('from', from).andWhere('to', to).andWhere('car_id', car_id)
+                         .andWhere('person_id', person_id).then(rental =>
+        {
+            return rental.length > 0;
+        });
 }
