@@ -17,12 +17,6 @@ app.use(bodyParser.urlencoded({
     extended: true,
 }));
 
-
-app.get('/rentals', (req, res) =>
-{
-    Rental.query().then(rentalList => res.send(rentalList));
-});
-
 app.get('/persons', (req, res) =>
 {
     Person.query().then(personList => res.send(personList));
@@ -34,9 +28,8 @@ app.get('/cars', (req, res) =>
 });
 
 
-app.post('/addRental', async (req, res) =>
+app.post('/rentals', async (req, res) =>
 {
-    //console.log(await isCarInTable(req.body.car_id));
     //Check for person and car existence
     if(await isPersonInTable(req.body.person_id) && await isCarInTable(req.body.car_id))
     {
@@ -50,111 +43,90 @@ app.post('/addRental', async (req, res) =>
                        let dateEndRental = moment(req.body.to).format('YYYY-MM-DD hh:mm:ss');
                        if(dateEndRental>dateStartRental && dateStartRental > moment().format('YYYY-MM-DD hh:mm:ss'))
                        {
-                           //console.log('Les dates sont cohérentes');
                            if(await isRentalUnique(req.body.from, req.body.to, req.body.car_id, req.body.person_id) === false)
                            {
                                //Get average carbon intensity for specified date
                                let avg = Math.round(await getIntensityFromDate(req.body.from));
                                if (avg === 0)
                                {
-                                   res.send(`Nous n'avons aucune information quant aux prévisions d'intensité carbone.
-                                    votre réservation sera tout de même faite mais roulez doucement` +
-                                       ` Votre réservation a bien été effectuée.
-                                             Vous avez réservé la voiture n° ${req.body.car_id},
-                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
-                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
-                                   //console.log('car.emission == 0');
-                                   await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                   await applyRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id);
                                    await updateCarStatusFromId(req.body.car_id);
+                                   res.send('Code ' + res.statusCode + '\r' + await getRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id));
                                }
                                else if(0 < avg <= 250)
                                {
-                                   //console.log('Prévision à avg <= 250');
                                    if (carEmission < 80)
                                    {
-                                       //console.log('car.emission < 80');
-                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await applyRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id);
                                        await updateCarStatusFromId(req.body.car_id);
-                                       res.send(`Votre réservation a bien été effectuée.
-                                             Vous avez réservé la voiture n° ${req.body.car_id},
-                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
-                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
+                                       res.send('Code ' + res.statusCode + '\r' + await getRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id));
                                    }
 
                                    else if(80 < carEmission < 100)
                                    {
-                                       //console.log('80 < car.emission < 100');
-                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await applyRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id);
                                        await updateCarStatusFromId(req.body.car_id);
-                                       res.send(`Votre réservation a bien été effectuée.
-                                             Vous avez réservé la voiture n° ${req.body.car_id},
-                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
-                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
+                                       res.send('Code ' + res.statusCode + '\r' + await getRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id));
                                    }
 
                                    else if(100 < carEmission < 140)
                                    {
-                                       //console.log('100 < car.emission < 120');
-                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await applyRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id);
                                        await updateCarStatusFromId(req.body.car_id);
-                                       res.send(`Votre réservation a bien été effectuée.
-                                             Vous avez réservé la voiture n° ${req.body.car_id},
-                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
-                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}
-                                             mais l'empreinte carbon de votre voiture est élevée, roulez doucement`);
+                                       res.send('Code ' + res.statusCode + '\r' + await getRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id));
                                    }
                                    else
                                    {
-                                       res.send("La réservation n'a pas été faite, cette voiture pollue trop");
+                                       res.statusCode = 409;
+                                       res.send('Code ' + res.statusCode + '\r' +
+                                           'La voiture pollue trop au vue de la concetration en carbone acutelle');
                                    }
 
                                }
                                else if(avg > 250)
                                {
-                                   //console.log('Prévision à avg > 250');
                                    if (carEmission < 80)
                                    {
-                                       //console.log('car.emission < 80');
-                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await applyRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id);
                                        await updateCarStatusFromId(req.body.car_id);
-                                       res.send(`Votre réservation a bien été effectuée.
-                                             Vous avez réservé la voiture n° ${req.body.car_id},
-                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
-                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
+                                       res.send('Code ' + res.statusCode + '\r' + await getRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id));
                                    }
 
                                    else if(80 < carEmission < 120)
                                    {
-                                       //console.log('80 < car.emission < 100');
-                                       await applyRental(req.body.from, req.body.to, req.body.car_id, req.body.person_id);
+                                       await applyRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id);
                                        await updateCarStatusFromId(req.body.car_id);
-                                       res.send(`Votre réservation a bien été effectuée.
-                                             Vous avez réservé la voiture n° ${req.body.car_id},
-                                             du ${moment(req.body.from).format('YYYY-MM-DD hh:mm:ss')}
-                                             au ${moment(req.body.to).format('YYYY-MM-DD hh:mm:ss')}`);
+                                       res.send('Code ' + res.statusCode + '\r' + await getRental(dateStartRental, dateEndRental, req.body.car_id, req.body.person_id));
                                    }
 
                                    else
                                    {
-                                       res.send("La réservation n'a pas été faite, cette voiture pollue trop");
+                                       res.statusCode = 409;
+                                       res.send('Code ' + res.statusCode + '\r' +
+                                                'La voiture pollue trop au vue de la concetration en carbone acutelle');
                                    }
                                }
                            }
                            else
                            {
-                               res.send('Vous avez déja réservé ce véhicule à la même date');
+                               res.statusCode = 409;
+                               res.send('Code ' + res.statusCode + '\r' +
+                                        'La requête n\'est pas unique');
                            }
                        }
                        else
                        {
-                           res.send('Veuillez rentrer des dates correctes');
+                           res.statusCode = 403;
+                           res.send('Code ' + res.statusCode + '\r' +
+                                    'Les dates ne sont pas cohérentes');
                        }
                    }
                    else
                    {
-                       res.send('Ce véhicule est déjà réservé, veuillez en choisir un autre.');
+                       res.statusCode = 409;
+                       res.send('Code ' + res.statusCode + '\r' +
+                                'La voiture est déjà réservée');
                    }
-
                });
     }
 });
@@ -235,4 +207,10 @@ function isRentalUnique(from, to, car_id, person_id)
         {
             return rental.length > 0;
         });
+}
+
+function getRental(from, to, car_id, person_id)
+{
+    return Rental.query().where('from', from).andWhere('to', to).andWhere('car_id', car_id).andWhere('person_id', person_id)
+        .then(rental => {return rental;});
 }
