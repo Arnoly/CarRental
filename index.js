@@ -21,8 +21,18 @@ app.use(bodyParser.urlencoded({
 app.get('/rentals', (req, res) =>
 {
     Rental.query().then(rentalList => res.send(rentalList));
-
 });
+
+app.get('/persons', (req, res) =>
+{
+    Person.query().then(personList => res.send(personList));
+});
+
+app.get('/cars', (req, res) =>
+{
+    Car.query().then(carList => res.send(carList));
+});
+
 
 app.post('/addRental', async (req, res) =>
 {
@@ -30,9 +40,6 @@ app.post('/addRental', async (req, res) =>
     //Check for person and car existence
     if(await isPersonInTable(req.body.person_id) && await isCarInTable(req.body.car_id))
     {
-        //console.log('Person and car existence checked');
-        Person.query().findById(req.body.person_id).then(async person =>
-        {
                Car.query().findById(req.body.car_id).then(async car =>
                {
                    if(car.isReservee === 0)
@@ -137,8 +144,6 @@ app.post('/addRental', async (req, res) =>
                            {
                                res.send('Vous avez déja réservé ce véhicule à la même date');
                            }
-
-
                        }
                        else
                        {
@@ -151,7 +156,6 @@ app.post('/addRental', async (req, res) =>
                    }
 
                });
-        });
     }
 });
 
