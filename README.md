@@ -1,2 +1,0 @@
-# CarRental
-Car rental API
